@@ -5,6 +5,7 @@ import subprocess
 import time
 from pathlib import Path
 from typing import Optional, Tuple, List
+from urllib.parse import urlsplit, urlunsplit
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -35,6 +36,17 @@ def natural_sort_key(s: str) -> List:
     return [int(text) if text.isdigit() else text.lower() for text in re.split(r'([0-9]+)', s)]
 
 
+def _stream_base_url(ts_url: str, audio_only: bool) -> Optional[str]:
+    """Извлекает подписанный адрес HLS-потока нужного типа из URL сегмента."""
+    parsed_url = urlsplit(ts_url)
+    is_audio = bool(re.search(r"/seg-\d+-a1\.ts$", parsed_url.path))
+    is_video_audio = bool(re.search(r"/seg-\d+-v1-a1\.ts$", parsed_url.path))
+    if (audio_only and not is_audio) or (not audio_only and not is_video_audio):
+        return None
+    base_path = parsed_url.path.rsplit("/seg-", 1)[0]
+    return urlunsplit((parsed_url.scheme, parsed_url.netloc, base_path, parsed_url.query, ""))
+
+
 class SeleniumDownloader:
     def __init__(self, headless: bool = False, driver_path: Optional[str] = None):
         self.driver = self._init_driver(headless, driver_path)
@@ -61,7 +73,7 @@ class SeleniumDownloader:
         logger.info("Инициализация драйвера Selenium завершена.")
         return driver
 
-    def get_video_url(self, video_page_url: str) -> Optional[str]:
+    def get_video_url(self, video_page_url: str, audio_only: bool = False) -> Optional[str]:
         try:
             logger.info(f"Открываем страницу: {video_page_url}")
             self.driver.get(video_page_url)
@@ -77,21 +89,20 @@ class SeleniumDownloader:
 
             logger.info("Анализируем запросы браузера...")
             performance_log = self.driver.get_log("performance")
-            mp4_urls = []
+            stream_urls = []
 
             for entry in performance_log:
                 message = entry.get("message", "")
-                if "https://cfvod.kaltura.com/hls/p/" in message:
-                    match = re.search(r'"url":"(https://[^"]+\.ts)"', message)
+                if "cfvod.kaltura.com/" in message and "/hls/p/" in message:
+                    match = re.search(r'"url":"(https://[^"]+\.ts(?:\?[^"]*)?)"', message)
                     if match:
-                        ts_url = match.group(1)
-                        mp4_url = ts_url.split("/seg-")[0]
-                        if mp4_url not in mp4_urls:
-                            mp4_urls.append(mp4_url)
-                            logger.info(f"Найден MP4 URL: {mp4_url}")
+                        stream_url = _stream_base_url(match.group(1), audio_only)
+                        if stream_url and stream_url not in stream_urls:
+                            stream_urls.append(stream_url)
+                            logger.info(f"Найден HLS URL: {stream_url.split('?')[0]}")
 
-            if mp4_urls:
-                return mp4_urls[-1]
+            if stream_urls:
+                return stream_urls[-1]
         except Exception as e:
             logger.error(f"Ошибка при обработке страницы: {e}")
         return None
@@ -105,8 +116,8 @@ class VideoDownloader:
     def __init__(self, headless: bool = False, driver_path: Optional[str] = None):
         self.selenium = SeleniumDownloader(headless=headless, driver_path=driver_path)
 
-    def get_video_url(self, video_page_url: str) -> Optional[str]:
-        return self.selenium.get_video_url(video_page_url)
+    def get_video_url(self, video_page_url: str, audio_only: bool = False) -> Optional[str]:
+        return self.selenium.get_video_url(video_page_url, audio_only=audio_only)
 
     def download_segments(
         self,
@@ -115,7 +126,8 @@ class VideoDownloader:
         output_dir: Optional[str] = None,
         resume: bool = True,
         progress_callback: Optional[callable] = None,
-        stop_event: Optional[object] = None
+        stop_event: Optional[object] = None,
+        audio_only: bool = False
     ) -> Tuple[bool, Optional[str]]:
         if output_dir is None:
             video_uuid = self._extract_uuid(video_page_url)
@@ -138,24 +150,32 @@ class VideoDownloader:
                 logger.info(f"Загрузка остановлена на сегменте {file_number}")
                 break
 
-            filename = f"seg-{file_number}-v1-a1.ts"
-            ts_url = f"{base_url}/{filename}"
+            suffix = "a1.ts" if audio_only else "v1-a1.ts"
+            filename = f"seg-{file_number}-{suffix}"
+            parsed_base = urlsplit(base_url)
+            ts_url = urlunsplit(
+                (
+                    parsed_base.scheme,
+                    parsed_base.netloc,
+                    f"{parsed_base.path.rstrip('/')}/{filename}",
+                    parsed_base.query,
+                    "",
+                )
+            )
             output_path = os.path.join(output_dir, filename)
 
             command = [
                 "ffmpeg",
                 "-hide_banner",
                 "-loglevel", "error",
-                "-i", ts_url,
-                "-c", "copy",
                 "-user_agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                "-headers", "Accept: */*",
-                "-headers", "Accept-Language: ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7",
-                "-headers", "Connection: keep-alive",
+                "-headers", "Accept: */*\r\nAccept-Language: en-US,en;q=0.9\r\nConnection: keep-alive\r\n",
                 "-reconnect", "1",
                 "-reconnect_at_eof", "1",
                 "-reconnect_streamed", "1",
                 "-reconnect_delay_max", "2",
+                "-i", ts_url,
+                "-c", "copy",
                 output_path
             ]
 

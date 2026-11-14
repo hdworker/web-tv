@@ -35,14 +35,16 @@ main.py
     ├── api/endpoints/create.py
     ├── api/endpoints/download.py
     ├── api/endpoints/transcribe.py
+    ├── api/endpoints/caption_preparation.py
     └── api/endpoints/utils.py
 ```
 
 - `api/models.py` — Pydantic-модели запросов и ответов.
 - `api/state.py` — словарь состояний фоновых загрузок (`threading.Event`).
 - `api/services/` — сервисы чтения транскрипта и информации о сегментах.
-- Фоновые операции (загрузка, склейка, транскрибация) запускаются в отдельных
-  потоках внутри процесса API. Состояние хранится в памяти процесса.
+- Фоновые операции загрузки, склейки и транскрибации запускаются в отдельных
+  потоках внутри процесса API. Прогресс задачи хранится в памяти процесса;
+  завершённые субтитры и метаданные FLAC сохраняются в SQLite.
 
 ### 2.3. Прикладные модули
 
@@ -53,6 +55,16 @@ main.py
 | `downloader.py` | Selenium: поиск HLS-URL; ffmpeg: скачивание, проверка и склейка сегментов |
 | `transcript_extractor.py` | Selenium/requests + BeautifulSoup: извлечение транскрипта |
 | `transcriber.py` | WhisperX: извлечение аудио, распознавание, выравнивание, диаризация |
+| `api/services/caption_pipeline.py` | Выбор сохранённого FLAC или конвейера загрузки |
+| `api/services/caption_stream.py` | Consumer: ASR-блоки по порядку одной моделью |
+| `api/services/caption_stream_producer.py` | Producer: окна HLS → очередь блоков → FLAC |
+| `api/services/caption_segmenter.py` | Параллельная загрузка окон аудиосегментов с таймкодами |
+| `api/services/caption_identity.py` | Канонический asset URL и ключ кеша ASR/перевода |
+| `api/services/caption_jobs.py` | Очередь подготовки и сохранение cues |
+| `api/services/caption_job_state.py` | Состояние задач в памяти процесса |
+| `api/services/caption_job_callbacks.py` | Колбэки прогресса и частичных блоков |
+| `api/services/translation_engines.py` | Локальный перевод фраз: opus-mt и Argos |
+| `api/services/tts_edge.py` | Синтез Edge TTS с кешем mp3 и перебором голосов |
 | `summarizer.py` | OpenAI-совместимый HTTP-клиент: суммаризация, перевод, ключевые слова |
 | `rutube.py` | Selenium: авторизация, cookies, загрузка видео и метаданных на Rutube |
 | `database.py` | SQLite: датаклассы `Video`, `Transcription`, `DownloadLog` и CRUD |
@@ -149,6 +161,32 @@ python rutube_cli.py login|upload|upload-db
       → Database.update_video(rutube_video_url=...)
 ```
 
+### 3.6. Синхронизированные субтитры
+
+```text
+POST /api/videos/captions/prepare
+  → canonical asset + ключ ASR
+  → cache hit? вернуть сохранённые cues
+  → иначе фоновая задача
+      → HLS audio-only segments
+      → до 9 сегментов загружаются параллельно
+      → первый ASR-блок ~30 с, далее блоки ~2 мин
+      → ограниченная очередь ASR-блоков
+          → пока один блок распознаётся, следующие сегменты загружаются
+      → временная склейка TS
+      → постоянный FLAC в video/captions/
+      → временный WAV для локального/облачного ASR
+      → каждый готовый блок сразу пишется в caption_caches
+        с is_complete=0 и уходит клиенту событием partial
+      → при включённом переводе блок переводится до публикации
+        (движок opus или argos, поле translation рядом с text)
+      → по завершении потока: is_complete=1 и событие complete
+  → WS /api/videos/captions/jobs/{job_id}/ws
+  → extension: cues по video.currentTime
+      → браузерный speechSynthesis или mp3 из /captions/tts/audio
+      → громкость видео приглушается на время реплики
+```
+
 ## 4. Модель данных SQLite
 
 Таблица `videos`:
@@ -168,6 +206,21 @@ python rutube_cli.py login|upload|upload-db
 - `id`, `video_id`, `language`, `transcript_text`, `summary_text`;
 - `created_at`, `updated_at`.
 
+Таблица `caption_media`:
+
+- `asset_key`, канонический `video_url`, путь к FLAC;
+- формат, длительность, размер файла и даты создания/обновления.
+
+Таблица `caption_caches`:
+
+- ключ кеша, `asset_key`, режим/модель ASR, язык;
+- `cues_json` с временными метками фраз и дата создания;
+- `is_complete`: 0 — блоки ещё дозаписываются, 1 — транскрипт готов.
+
+FLAC-файлы хранятся в `video/captions/` без автоматического срока удаления.
+Временные TS/WAV-файлы удаляются после подготовки. Ключ кеша учитывает URL,
+режим, модель, язык и версию pipeline.
+
 Статусы видео: `new`, `downloaded`, `partial`, `transcribed`, `uploading`,
 `upload_failed`.
 
@@ -176,8 +229,8 @@ python rutube_cli.py login|upload|upload-db
 1. Нет автоматических тестов и CI.
 2. Файлы `database.py`, `downloader.py`, `rutube.py`, `main.py` и `translate_cli.py`
    превышают целевой лимит 150 строк; часть функций длиннее 30 строк.
-3. Фоновые задачи живут в потоках процесса API: при перезапуске состояние теряется,
-   горизонтальное масштабирование невозможно.
+3. Активные задачи живут в потоках процесса API: при перезапуске прогресс
+   теряется; сохранённые cues и FLAC-архивы остаются доступны в SQLite/на диске.
 4. API без аутентификации, CORS `*`; предполагается локальный/внутренний контур.
 5. Selenium-селекторы зависят от вёрстки UN WebTV и Rutube.
 6. WhisperX и ffmpeg — внешние системные зависимости; модель `large-v3` тяжёлая.

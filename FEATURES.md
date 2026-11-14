@@ -2,6 +2,29 @@
 
 Дата фиксации: 2026-11-14.
 
+## Живые субтитры UN Web TV
+
+- Распаковываемое Chrome Manifest V3 расширение в `extension/`.
+- Предварительная обработка аудио HLS и показ фраз по `video.currentTime`.
+- Загрузка HLS окнами до 9 сегментов; ASR-блоки обрабатываются конвейером
+  с ограниченной очередью.
+- Первый блок — 30 секунд аудио, поэтому субтитры можно показывать почти сразу;
+  каждый готовый блок сохраняется и сразу передаётся расширению по WebSocket,
+  не дожидаясь конца записи.
+- Переключение локального WhisperX и облачного OpenAI-совместимого ASR.
+- Локальный перевод фраз: движки `opus` (Helsinki-NLP opus-mt-en-ru через
+  transformers) и `argos` (Argos Translate); язык перевода пока `ru`.
+- Озвучка субтитров: браузерный `speechSynthesis` или Edge TTS (mp3 с
+  дисковым кешем в `video/tts/`); источник — перевод или оригинал; громкость
+  видео приглушается на время реплики.
+- API: `GET /api/videos/live-transcription/health`,
+  `POST /api/videos/captions/prepare`, `GET/WS /api/videos/captions/jobs/{job_id}`,
+  `GET /api/videos/captions/media/{asset_key}`,
+  `GET /api/videos/captions/tts/voices`, `GET /api/videos/captions/tts/audio`.
+- FLAC-аудио и таймкодированные результаты хранятся без срока в SQLite и
+  `video/captions/`; повторная подготовка переиспользует кеш.
+- Установка и настройка описаны в `extension/README.md`.
+
 ## Расписание и метаданные
 
 - `schedule_parser.py` — парсинг расписания UN WebTV за день и период.

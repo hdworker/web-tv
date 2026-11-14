@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width">
+    <title>Субтитры UN Web TV</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main>
+      <h1>Субтитры UN Web TV</h1>
+
+      <label for="mode">Распознавание</label>
+      <select id="mode">
+        <option value="local">Локальный WhisperX</option>
+        <option value="cloud">Облачный сервис</option>
+      </select>
+
+      <label for="translateTo">Перевод</label>
+      <select id="translateTo">
+        <option value="">Без перевода</option>
+        <option value="ru">Русский</option>
+      </select>
+
+      <label for="translationEngine">Движок перевода</label>
+      <select id="translationEngine">
+        <option value="opus">Opus MT (лучше качество)</option>
+        <option value="argos">Argos Translate</option>
+      </select>
+
+      <label class="check"><input id="tts" type="checkbox"> Озвучка</label>
+
+      <label for="ttsSource">Что озвучивать</label>
+      <select id="ttsSource">
+        <option value="translation">Перевод</option>
+        <option value="original">Оригинал</option>
+      </select>
+
+      <label for="ttsProvider">Движок озвучки</label>
+      <select id="ttsProvider">
+        <option value="browser">Браузер</option>
+        <option value="edge">Edge TTS</option>
+      </select>
+
+      <label for="ttsVoice">Голос Edge</label>
+      <select id="ttsVoice">
+        <option value="">Загружаю голоса…</option>
+      </select>
+
+      <label for="apiUrl">Адрес API</label>
+      <input id="apiUrl" type="url" value="http://127.0.0.1:8000">
+
+      <button id="prepare">Подготовить субтитры</button>
+      <p id="status" role="status">Готово</p>
+      <script src="popup.js"></script>
+    </main>
+  </body>
+</html>

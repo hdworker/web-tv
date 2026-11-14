@@ -19,6 +19,16 @@ chromedriver-autoinstaller>=0.6,<1.0
 # Перевод транскриптов
 translators>=5.9,<6.0
 
+# Локальный перевод субтитров: opus-mt через transformers
+transformers>=4.40,<6.0
+
+# Озвучка субтитров через Edge TTS (нужна версия 7.x: более старые получают 403)
+edge-tts>=7.3,<8.0
+
+# Опционально: альтернативный движок перевода субтитров.
+# Тянет stanza и модель ~187 МБ:
+#   pip install argostranslate
+
 # Опционально: транскрибация через WhisperX.
 # Устанавливается отдельно из-за тяжёлых зависимостей (torch, ffmpeg):
 #   pip install whisperx

@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "minimum_chrome_version": "116",
+  "name": "UN Web TV Live Captions",
+  "version": "0.1.0",
+  "description": "Добавляет распознаваемые субтитры поверх видео UN Web TV.",
+  "permissions": ["activeTab", "alarms", "scripting", "storage"],
+  "host_permissions": [
+    "https://webtv.un.org/*",
+    "http://127.0.0.1:8000/*",
+    "http://localhost:8000/*"
+  ],
+  "background": {
+    "service_worker": "service-worker.js"
+  },
+  "action": {
+    "default_title": "UN Web TV Live Captions",
+    "default_popup": "popup.html"
+  }
+}
