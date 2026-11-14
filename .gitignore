@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Локальная конфигурация и секреты
+config.json
+.env
+.env.*
+rutube_cookies.json
+token.json
+credentials.json
+*.pem
+
+# Данные и результаты работы
+*.db
+*.sqlite
+*.sqlite3
+*.log
+video/
+audio_*.wav
+*.mp4
+*.vtt
+*.srt
+video_links_*.csv
+video_data_*.xlsx
+caption_result.txt
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/*.local
+
+# IDE / ОС
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Служебные файлы агентов и отладочные дампы
+.aider*
+session-*.md
+network_requests.json
+network_responses.json
+*_output.html

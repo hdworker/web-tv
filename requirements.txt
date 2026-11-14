@@ -1,0 +1,24 @@
+# Основные зависимости backend
+fastapi>=0.110,<1.0
+uvicorn[standard]>=0.29,<1.0
+pydantic>=2.6,<3.0
+
+# Парсинг страниц UN WebTV
+requests>=2.31,<3.0
+beautifulsoup4>=4.12,<5.0
+lxml>=5.1,<6.0
+
+# Экспорт расписания в CSV/Excel
+pandas>=2.2,<3.0
+openpyxl>=3.1,<4.0
+
+# Автоматизация браузера (загрузка видео и Rutube)
+selenium>=4.18,<5.0
+chromedriver-autoinstaller>=0.6,<1.0
+
+# Перевод транскриптов
+translators>=5.9,<6.0
+
+# Опционально: транскрибация через WhisperX.
+# Устанавливается отдельно из-за тяжёлых зависимостей (torch, ffmpeg):
+#   pip install whisperx

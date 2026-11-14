@@ -1,0 +1,6 @@
+{
+  "dev": true,
+  "log_requests": true,
+  "log_responses": true,
+  "log_level": "DEBUG"
+}
