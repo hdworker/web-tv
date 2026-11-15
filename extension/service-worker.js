@@ -2,7 +2,12 @@ importScripts("caption-socket.js");
 
 const JOB_STORAGE_KEY = "captionPreparationJob";
 const RECONNECT_ALARM = "caption-websocket-reconnect";
-const INJECTED = ["caption-panel.js", "caption-speech.js", "captions.js"];
+const INJECTED = [
+  "caption-panel.js",
+  "caption-timing.js",
+  "caption-speech.js",
+  "captions.js"
+];
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type !== "captions:prepare") return;

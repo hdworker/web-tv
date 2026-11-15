@@ -1,5 +1,7 @@
 body {
   width: 300px;
+  max-height: 600px;
+  overflow-y: auto;
   margin: 0;
   color: #202733;
   font: 13px/1.4 system-ui, sans-serif;
@@ -22,6 +24,17 @@ label {
   color: #3b475a;
 }
 
+label output {
+  color: #526071;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+small {
+  margin-top: -5px;
+  color: #526071;
+}
+
 label.check {
   display: flex;
   align-items: center;
@@ -32,7 +45,7 @@ label.check {
 }
 
 select,
-input,
+input:not([type="range"]),
 button {
   box-sizing: border-box;
   width: 100%;
@@ -42,6 +55,25 @@ button {
   border-radius: 6px;
   background: white;
   font: inherit;
+}
+
+input[type="range"] {
+  width: 100%;
+  margin: -3px 0 2px;
+  accent-color: #155eef;
+}
+
+.engine-settings {
+  display: grid;
+  gap: 6px;
+  padding: 9px;
+  border: 1px solid #e1e5eb;
+  border-radius: 7px;
+  background: #f8fafc;
+}
+
+.engine-settings[hidden] {
+  display: none;
 }
 
 label.check input {

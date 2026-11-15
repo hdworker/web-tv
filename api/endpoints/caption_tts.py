@@ -27,13 +27,16 @@ def voices(lang: str = "ru") -> dict:
 def audio(
     text: str = Query(min_length=1, max_length=MAX_TEXT),
     voice: str = Query(min_length=3, max_length=64),
+    rate: int = Query(default=0, ge=-50, le=50),
+    pitch: int = Query(default=0, ge=-50, le=50),
+    volume: int = Query(default=0, ge=-50, le=50),
 ) -> FileResponse:
     """Синтезирует фразу выбранным голосом Edge TTS и отдаёт mp3 из кеша."""
     if any(char not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-"
                and not char.isdigit() for char in voice):
         raise HTTPException(status_code=400, detail="Некорректное имя голоса")
     try:
-        path = synthesize(text, voice)
+        path = synthesize(text, voice, rate=rate, pitch=pitch, volume=volume)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     except Exception as error:

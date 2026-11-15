@@ -8,12 +8,19 @@ let lastCueIndex = -2;
 let processing = false;
 let statusMessage = "Подготовка субтитров";
 let displayTranslation = false;
+let captionOffset = 0;
 
-chrome.storage.local.get(["translateTo"], (settings) => {
+chrome.storage.local.get(["translateTo", "captionOffset"], (settings) => {
   displayTranslation = Boolean(settings.translateTo);
+  captionOffset = self.CaptionTiming.normalizeOffset(settings.captionOffset);
 });
 chrome.storage.onChanged.addListener((changes) => {
   if (changes.translateTo) displayTranslation = Boolean(changes.translateTo.newValue);
+  if (changes.captionOffset) {
+    captionOffset = self.CaptionTiming.normalizeOffset(changes.captionOffset.newValue);
+    lastCueIndex = -2;
+    renderCurrentCue();
+  }
 });
 
 chrome.runtime.onMessage.addListener((message) => {
@@ -130,19 +137,7 @@ function createPanelFallback() {
 }
 
 function findCue(time) {
-  let low = 0;
-  let high = cues.length - 1;
-  let candidate = -1;
-  while (low <= high) {
-    const middle = (low + high) >> 1;
-    if (cues[middle].start <= time) {
-      candidate = middle;
-      low = middle + 1;
-    } else {
-      high = middle - 1;
-    }
-  }
-  return candidate >= 0 && time < cues[candidate].end ? candidate : -1;
+  return self.CaptionTiming.findCue(cues, time, captionOffset);
 }
 
 new MutationObserver(bindVideos).observe(document.documentElement, {

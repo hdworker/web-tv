@@ -28,6 +28,10 @@
         <option value="argos">Argos Translate</option>
       </select>
 
+      <label for="captionOffset">Сдвиг субтитров (секунды)</label>
+      <input id="captionOffset" type="number" min="-3" max="3" step="0.1" value="0">
+      <small>− раньше · + позже</small>
+
       <label class="check"><input id="tts" type="checkbox"> Озвучка</label>
 
       <label for="ttsSource">Что озвучивать</label>
@@ -42,16 +46,44 @@
         <option value="edge">Edge TTS</option>
       </select>
 
-      <label for="ttsVoice">Голос Edge</label>
-      <select id="ttsVoice">
-        <option value="">Загружаю голоса…</option>
-      </select>
+      <section id="browserTtsSettings" class="engine-settings" hidden>
+        <label for="browserVoice">Голос браузера</label>
+        <select id="browserVoice">
+          <option value="">Голос по умолчанию</option>
+        </select>
+
+        <label for="browserRate">Скорость <output id="browserRateValue">1,0×</output></label>
+        <input id="browserRate" type="range" min="0.5" max="2" step="0.1" value="1">
+
+        <label for="browserPitch">Высота тона <output id="browserPitchValue">1,0</output></label>
+        <input id="browserPitch" type="range" min="0" max="2" step="0.1" value="1">
+
+        <label for="browserVolume">Громкость речи <output id="browserVolumeValue">100%</output></label>
+        <input id="browserVolume" type="range" min="0" max="1" step="0.05" value="1">
+      </section>
+
+      <section id="edgeTtsSettings" class="engine-settings" hidden>
+        <label for="ttsVoice">Голос Edge</label>
+        <select id="ttsVoice">
+          <option value="">Загружаю голоса…</option>
+        </select>
+
+        <label for="edgeRate">Скорость <output id="edgeRateValue">+0%</output></label>
+        <input id="edgeRate" type="range" min="-50" max="50" step="5" value="0">
+
+        <label for="edgePitch">Высота тона <output id="edgePitchValue">+0 Гц</output></label>
+        <input id="edgePitch" type="range" min="-50" max="50" step="5" value="0">
+
+        <label for="edgeVolume">Громкость речи <output id="edgeVolumeValue">+0%</output></label>
+        <input id="edgeVolume" type="range" min="-50" max="50" step="5" value="0">
+      </section>
 
       <label for="apiUrl">Адрес API</label>
       <input id="apiUrl" type="url" value="http://127.0.0.1:8000">
 
       <button id="prepare">Подготовить субтитры</button>
       <p id="status" role="status">Готово</p>
+      <script src="popup-tts-settings.js"></script>
       <script src="popup.js"></script>
     </main>
   </body>

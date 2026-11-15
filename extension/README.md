@@ -85,6 +85,11 @@ Two providers are available:
 - **Edge TTS** — neural voices via the backend (`edge-tts>=7.3`), cached as mp3
   in `video/tts/`. Requires internet access to Microsoft.
 
+Each engine has its own saved voice, rate, pitch, and volume settings. Browser
+voices come from `speechSynthesis.getVoices()`; Edge TTS uses rate/volume
+adjustments in percent and pitch in hertz. Settings are stored in extension
+storage and shared across tabs.
+
 The video volume is ducked to 20% while a cue is spoken and restored afterwards.
 Edge TTS occasionally returns an empty stream for a specific voice and phrase;
 the backend then retries with another voice of the same locale, and the
@@ -99,10 +104,15 @@ match the language of the spoken text.
 - `WS /api/videos/captions/jobs/{job_id}/ws`
 - `GET /api/videos/captions/media/{asset_key}`
 - `GET /api/videos/captions/tts/voices?lang=ru|en`
-- `GET /api/videos/captions/tts/audio?text=&voice=`
+- `GET /api/videos/captions/tts/audio?text=&voice=&rate=&pitch=&volume=`
 
 The preparation API returns cue objects with `start`, `end`, and `text` fields.
 Active job progress is held in memory. If the API restarts, the extension
 restarts the job and reuses the saved FLAC when available. Completed cues and
 FLAC metadata persist in SQLite; the file is at
 `video/captions/<asset_key>.flac`.
+
+The popup also provides a caption display offset from −3.0 to +3.0 seconds in
+0.1-second steps. Positive values delay both appearance and disappearance;
+negative values move both earlier. The offset only affects cue lookup against
+the video's current time and does not modify stored timestamps.

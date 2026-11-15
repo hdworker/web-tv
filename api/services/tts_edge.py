@@ -11,27 +11,44 @@ CACHE_DIR = Path("video") / "tts"
 _voices: list[dict] | None = None
 
 
-def synthesize(text: str, voice: str) -> Path:
+def synthesize(
+    text: str,
+    voice: str,
+    *,
+    rate: int = 0,
+    pitch: int = 0,
+    volume: int = 0,
+) -> Path:
     """Возвращает путь к mp3, синтезируя его при первом обращении."""
     text = text.strip()
     if not text:
         raise ValueError("Пустой текст для озвучки")
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    digest = hashlib.sha1(f"{voice}|{text}".encode("utf-8")).hexdigest()
+    digest = hashlib.sha1(
+        f"{voice}|{rate}|{pitch}|{volume}|{text}".encode("utf-8")
+    ).hexdigest()
     target = CACHE_DIR / f"{digest}.mp3"
     if target.is_file() and target.stat().st_size > 512:
         return target
-    audio = _synthesize_with_fallback(text, voice)
+    audio = _synthesize_with_fallback(text, voice, rate, pitch, volume)
     target.write_bytes(audio)
     return target
 
 
-def _synthesize_with_fallback(text: str, voice: str) -> bytes:
+def _synthesize_with_fallback(
+    text: str,
+    voice: str,
+    rate: int,
+    pitch: int,
+    volume: int,
+) -> bytes:
     """Перебирает голоса той же локали: отдельные голоса иногда отдают пустой поток."""
     errors = []
     for candidate in _candidates(voice):
         try:
-            audio = asyncio.run(_stream_audio(text, candidate))
+            audio = asyncio.run(
+                _stream_audio(text, candidate, rate=rate, pitch=pitch, volume=volume)
+            )
         except Exception as error:
             errors.append(f"{candidate}: {error}")
             continue
@@ -75,11 +92,24 @@ async def _fetch_voices() -> list[dict]:
     return await edge_tts.list_voices()
 
 
-async def _stream_audio(text: str, voice: str) -> bytes:
+async def _stream_audio(
+    text: str,
+    voice: str,
+    *,
+    rate: int = 0,
+    pitch: int = 0,
+    volume: int = 0,
+) -> bytes:
     """Собирает mp3-поток Edge TTS в один буфер."""
     import edge_tts
 
-    communicate = edge_tts.Communicate(text, voice)
+    communicate = edge_tts.Communicate(
+        text,
+        voice,
+        rate=f"{rate:+d}%",
+        pitch=f"{pitch:+d}Hz",
+        volume=f"{volume:+d}%",
+    )
     buffer = bytearray()
     async for chunk in communicate.stream():
         if chunk["type"] == "audio":

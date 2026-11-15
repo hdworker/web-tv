@@ -1,6 +1,8 @@
+import asyncio
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from fastapi import FastAPI
@@ -8,6 +10,7 @@ from fastapi.testclient import TestClient
 
 from api.endpoints import caption_preparation, caption_tts
 from api.services.caption_identity import cache_identity
+from api.services import tts_edge
 
 
 def build_client() -> TestClient:
@@ -105,12 +108,34 @@ class TtsEndpointTests(unittest.TestCase):
             synthesize.return_value = path
             response = self.client.get(
                 "/api/videos/captions/tts/audio",
-                params={"text": "Доброе утро", "voice": "ru-RU-DmitryNeural"},
+                params={
+                    "text": "Доброе утро",
+                    "voice": "ru-RU-DmitryNeural",
+                    "rate": 10,
+                    "pitch": -5,
+                    "volume": 20,
+                },
             )
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.content, b"ID3test")
         self.assertEqual(response.headers["content-type"], "audio/mpeg")
+        synthesize.assert_called_once_with(
+            "Доброе утро",
+            "ru-RU-DmitryNeural",
+            rate=10,
+            pitch=-5,
+            volume=20,
+        )
+
+    def test_audio_rejects_edge_values_outside_supported_ranges(self):
+        """Ограничивает параметры Edge TTS безопасными диапазонами."""
+        response = self.client.get(
+            "/api/videos/captions/tts/audio",
+            params={"text": "Hello", "voice": "en-US-AriaNeural", "rate": 75},
+        )
+
+        self.assertEqual(response.status_code, 422)
 
     @patch("api.endpoints.caption_tts.synthesize")
     def test_audio_reports_unavailable_service(self, synthesize):
@@ -123,6 +148,65 @@ class TtsEndpointTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 502)
 
+
+class EdgeTtsParameterTests(unittest.TestCase):
+    """Проверки передачи настроек в библиотеку Edge TTS."""
+
+    def test_stream_uses_requested_rate_pitch_and_volume(self):
+        """Преобразует числовые настройки в формат Edge TTS."""
+        received = {}
+
+        class FakeCommunicate:
+            """Подмена сетевого клиента Edge TTS для изолированного теста."""
+
+            def __init__(self, text, voice, **options):
+                received.update(text=text, voice=voice, **options)
+
+            async def stream(self):
+                yield {"type": "audio", "data": b"x" * 512}
+
+        fake_module = SimpleNamespace(Communicate=FakeCommunicate)
+        with patch.dict("sys.modules", {"edge_tts": fake_module}):
+            audio = asyncio.run(
+                tts_edge._stream_audio(
+                    "Hello",
+                    "en-US-AriaNeural",
+                    rate=10,
+                    pitch=-5,
+                    volume=20,
+                )
+            )
+
+        self.assertEqual(len(audio), 512)
+        self.assertEqual(
+            received,
+            {
+                "text": "Hello",
+                "voice": "en-US-AriaNeural",
+                "rate": "+10%",
+                "pitch": "-5Hz",
+                "volume": "+20%",
+            },
+        )
+
+    def test_cache_separates_audio_settings(self):
+        """Не возвращает аудио из кеша с другими параметрами речи."""
+        with tempfile.TemporaryDirectory() as folder:
+            with patch.object(tts_edge, "CACHE_DIR", Path(folder)):
+                with patch.object(
+                    tts_edge,
+                    "_synthesize_with_fallback",
+                    return_value=b"x" * 600,
+                ) as synthesize:
+                    normal = tts_edge.synthesize("Hello", "en-US-AriaNeural")
+                    faster = tts_edge.synthesize(
+                        "Hello", "en-US-AriaNeural", rate=10
+                    )
+                    repeated = tts_edge.synthesize("Hello", "en-US-AriaNeural")
+
+        self.assertNotEqual(normal, faster)
+        self.assertEqual(normal, repeated)
+        self.assertEqual(synthesize.call_count, 2)
 
 if __name__ == "__main__":
     unittest.main()
