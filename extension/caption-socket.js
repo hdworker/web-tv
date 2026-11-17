@@ -28,6 +28,7 @@ self.CaptionSocket = (() => {
       notifyTab(job.tabId, "captions:partial", {
         message: message.job.message,
         cues: message.job.cues,
+        liveStream: Boolean(message.job.live_stream),
         blocksDone: message.job.blocks_done
       });
       return;
@@ -47,6 +48,7 @@ self.CaptionSocket = (() => {
     if (state.status === "complete") {
       finishJob(job, socket, "captions:prepared", {
         cues: state.cues,
+        liveStream: Boolean(state.live_stream),
         assetKey: state.asset_key,
         cached: false
       });
@@ -84,7 +86,12 @@ self.CaptionSocket = (() => {
       if (state.status === "complete" || state.status === "failed") {
         const type = state.status === "complete" ? "captions:prepared" : "captions:failed";
         const values = state.status === "complete"
-          ? { cues: state.cues, assetKey: state.asset_key, cached: false }
+          ? {
+            cues: state.cues,
+            liveStream: Boolean(state.live_stream),
+            assetKey: state.asset_key,
+            cached: false
+          }
           : { message: state.message };
         await finishJob(job, { close: () => {} }, type, values);
         return;
@@ -101,7 +108,11 @@ self.CaptionSocket = (() => {
       const response = await fetch(`${job.apiUrl}/api/videos/captions/prepare`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ video_url: job.videoUrl, mode: job.mode })
+        body: JSON.stringify({
+          video_url: job.videoUrl,
+          mode: job.mode,
+          live_stream: Boolean(job.liveStream)
+        })
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.detail || "Не удалось восстановить задачу");
@@ -130,6 +141,7 @@ self.CaptionSocket = (() => {
       notifyTab(tabId, "captions:partial", {
         message: state.message,
         cues: state.cues,
+        liveStream: Boolean(state.live_stream),
         blocksDone: state.blocks_done
       });
       return;

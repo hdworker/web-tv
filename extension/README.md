@@ -19,6 +19,13 @@ against the video player's current time.
 4. Start playback once the extension reports the first recognized block.
    Captions follow the player's timeline, including pause and seek.
 
+For a live UN Web TV event, check **Онлайн-трансляция** before starting. The
+backend follows the player's authorized live HLS audio rendition and sends
+short WAV blocks to ASR. The overlay shows the most recently recognized phrases
+as they arrive; this is a rolling transcript, not frame-accurate live captions.
+Use **Остановить онлайн-трансляцию** in the popup to stop capture and keep the
+recognized cues. Leave the checkbox off for recorded videos.
+
 The backend downloads the audio-only HLS rendition, writes a lossless FLAC
 archive under `video/captions/`, and saves timecoded cues in SQLite. Temporary
 TS segments and WAV files are removed after preparation. FLAC archives and cue

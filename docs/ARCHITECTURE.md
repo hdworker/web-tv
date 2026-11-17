@@ -166,23 +166,25 @@ python rutube_cli.py login|upload|upload-db
 ```text
 POST /api/videos/captions/prepare
   → canonical asset + ключ ASR
-  → cache hit? вернуть сохранённые cues
-  → иначе фоновая задача
-      → HLS audio-only segments
-      → до 9 сегментов загружаются параллельно
-      → первый ASR-блок ~30 с, далее блоки ~2 мин
-      → ограниченная очередь ASR-блоков
-          → пока один блок распознаётся, следующие сегменты загружаются
-      → временная склейка TS
-      → постоянный FLAC в video/captions/
-      → временный WAV для локального/облачного ASR
-      → каждый готовый блок сразу пишется в caption_caches
-        с is_complete=0 и уходит клиенту событием partial
-      → при включённом переводе блок переводится до публикации
-        (движок opus или argos, поле translation рядом с text)
-      → по завершении потока: is_complete=1 и событие complete
+  → live_stream=false:
+      → cache hit с FLAC? вернуть сохранённые cues
+      → иначе фоновая numbered HLS/VOD задача (прежний путь)
+          → до 9 сегментов загружаются параллельно
+          → первый ASR-блок ~30 с, далее блоки ~2 мин
+          → ограниченная очередь ASR-блоков
+              → пока один блок распознаётся, следующие сегменты загружаются
+          → временная склейка TS → FLAC → WAV для ASR
+          → cues сохраняются и публикуются по мере готовности блоков
+  → live_stream=true:
+      → отдельный cache key, поиск авторизованного HLS master playlist
+      → выбор английской аудио-вариации; FFmpeg пишет 12-секундные WAV блоки
+      → WhisperX/OpenAI ASR → cues с таймкодом от начала захвата
+      → stop route завершает FFmpeg; cues сохраняются при остановке
+      → подписанные URL не сохраняются
+  → при включённом переводе блок переводится до публикации
+      (движок opus или argos, поле translation рядом с text)
   → WS /api/videos/captions/jobs/{job_id}/ws
-  → extension: cues по video.currentTime
+  → extension: VOD cues по video.currentTime; live — последние три фразы
       → браузерный speechSynthesis или mp3 из /captions/tts/audio
       → громкость видео приглушается на время реплики
 ```

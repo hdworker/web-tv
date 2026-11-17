@@ -9,6 +9,7 @@ let processing = false;
 let statusMessage = "Подготовка субтитров";
 let displayTranslation = false;
 let captionOffset = 0;
+let liveStreamMode = false;
 
 chrome.storage.local.get(["translateTo", "captionOffset"], (settings) => {
   displayTranslation = Boolean(settings.translateTo);
@@ -33,8 +34,13 @@ chrome.runtime.onMessage.addListener((message) => {
   if (message?.type === "captions:partial") {
     processing = true;
     cues = Array.isArray(message.cues) ? message.cues : cues;
+    liveStreamMode = Boolean(message.liveStream);
     statusMessage = `${message.message}. Можно запускать видео; обработка продолжается.`;
     lastCueIndex = -2;
+    if (liveStreamMode) {
+      showLiveTranscript();
+      return;
+    }
     panel.show(statusMessage, "status");
     bindVideos();
     renderCurrentCue();
@@ -46,8 +52,13 @@ chrome.runtime.onMessage.addListener((message) => {
   if (message?.type === "captions:prepared") {
     processing = false;
     cues = Array.isArray(message.cues) ? message.cues : [];
+    liveStreamMode = Boolean(message.liveStream);
     lastCueIndex = -2;
     const cacheLabel = message.cached ? " (из кеша)" : "";
+    if (liveStreamMode) {
+      showLiveTranscript();
+      return;
+    }
     panel.show(`Готово: ${cues.length} фраз${cacheLabel}. Запустите видео.`, "status");
     bindVideos();
   }
@@ -77,6 +88,7 @@ function renderCurrentCue() {
 }
 
 function renderCue(currentTime) {
+  if (liveStreamMode) return;
   const index = findCue(currentTime);
   if (index === lastCueIndex) return;
   lastCueIndex = index;
@@ -94,6 +106,15 @@ function renderCue(currentTime) {
   }
   panel.show(cueText(cues[index]), "caption");
   self.CaptionSpeech?.speak(cues[index], document.querySelector("video"));
+}
+
+function showLiveTranscript() {
+  const recent = cues.slice(-3).map(cueText).filter(Boolean);
+  if (!recent.length) {
+    panel.show("Онлайн-распознавание запущено; ожидаю первые фразы.", "status");
+    return;
+  }
+  panel.show(recent.join("\n"), "caption");
 }
 
 function cueText(cue) {

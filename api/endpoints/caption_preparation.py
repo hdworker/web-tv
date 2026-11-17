@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, HttpUrl
 
 from api.services.caption_identity import cache_identity
-from api.services.caption_jobs import get_job, start_job
+from api.services.caption_jobs import get_job, start_job, stop_job
 from api.services.caption_repository import CaptionRepository
 
 router = APIRouter(prefix="/captions", tags=["captions"])
@@ -24,6 +24,7 @@ class PrepareRequest(BaseModel):
     mode: Literal["local", "cloud"] = "local"
     translate_to: str = ""
     translation_engine: Literal["opus", "argos"] = "opus"
+    live_stream: bool = False
 
 
 @router.post("/prepare")
@@ -38,11 +39,18 @@ async def prepare(request: PrepareRequest, response: Response) -> dict:
         request.mode,
         request.translate_to,
         request.translation_engine,
+        live_stream=request.live_stream,
     )
     repository = CaptionRepository()
     cached = repository.get_cues(identity["cache_key"])
     media = repository.get_media(identity["asset_key"])
-    if cached and cached["is_complete"] and media and Path(media["audio_path"]).is_file():
+    if (
+        not request.live_stream
+        and cached
+        and cached["is_complete"]
+        and media
+        and Path(media["audio_path"]).is_file()
+    ):
         return {
             "status": "complete",
             "cached": True,
@@ -50,7 +58,12 @@ async def prepare(request: PrepareRequest, response: Response) -> dict:
             "cues": cached["cues"],
         }
     response.status_code = 202
-    return start_job(identity["canonical_url"], request.mode, identity)
+    return start_job(
+        identity["canonical_url"],
+        request.mode,
+        identity,
+        live_stream=request.live_stream,
+    )
 
 
 @router.get("/jobs/{job_id}")
@@ -63,6 +76,15 @@ def read_job(job_id: str) -> dict:
         cached = CaptionRepository().get_cues(job["cache_key"])
         job["cues"] = cached["cues"] if cached else []
     return job
+
+
+@router.post("/jobs/{job_id}/stop")
+def stop_live_job(job_id: str, response: Response) -> dict:
+    """Запрашивает остановку активной задачи прямого эфира."""
+    if not stop_job(job_id):
+        raise HTTPException(status_code=409, detail="Активный эфир для остановки не найден")
+    response.status_code = 202
+    return {"job_id": job_id, "status": "stopping"}
 
 
 @router.websocket("/jobs/{job_id}/ws")

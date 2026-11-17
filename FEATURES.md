@@ -1,6 +1,6 @@
 # Реализованная функциональность
 
-Дата фиксации: 2026-11-14.
+Дата фиксации: 2026-11-16.
 
 ## Живые субтитры UN Web TV
 
@@ -24,11 +24,23 @@
   TTS — свой голос и относительные настройки скорости, тона и громкости.
 - API: `GET /api/videos/live-transcription/health`,
   `POST /api/videos/captions/prepare`, `GET/WS /api/videos/captions/jobs/{job_id}`,
+  `POST /api/videos/captions/jobs/{job_id}/stop`,
   `GET /api/videos/captions/media/{asset_key}`,
   `GET /api/videos/captions/tts/voices`, `GET /api/videos/captions/tts/audio`.
 - FLAC-аудио и таймкодированные результаты хранятся без срока в SQLite и
   `video/captions/`; повторная подготовка переиспользует кеш.
 - Установка и настройка описаны в `extension/README.md`.
+
+## Захват аудио прямого эфира — 2026-11-16
+
+- Флажок «Онлайн-трансляция» выбирает отдельный HLS/FFmpeg-конвейер;
+  без флажка обработка записей остаётся прежней.
+- Эфир распознаётся 12-секундными блоками; расширение показывает последние
+  фразы по мере поступления. Это rolling transcript, не синхронизация с кадрами.
+- Остановить захват можно из popup; готовые фразы сохраняются. Подписанные
+  HLS URL остаются в памяти процесса и не пишутся в лог или кеш.
+- API остановки: `POST /api/videos/captions/jobs/{job_id}/stop`.
+- Проверки: `python -m unittest discover -s tests`.
 
 ## Расписание и метаданные
 

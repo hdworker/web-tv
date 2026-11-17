@@ -34,6 +34,15 @@ class TranslationSettingsTests(unittest.TestCase):
         self.assertNotEqual(original["cache_key"], translated["cache_key"])
         self.assertEqual(translated["translate_to"], "ru")
 
+    def test_live_capture_uses_a_separate_cache_key(self):
+        """Не смешивает результаты прямого эфира с записью того же URL."""
+        url = "https://webtv.un.org/en/asset/id"
+
+        recording = cache_identity(url, "local")
+        live = cache_identity(url, "local", live_stream=True)
+
+        self.assertNotEqual(recording["cache_key"], live["cache_key"])
+
     def test_translation_engine_changes_cache_key(self):
         """Смена движка перевода должна пересобирать транскрипт."""
         url = "https://webtv.un.org/en/asset/id"

@@ -16,6 +16,11 @@
         <option value="cloud">Облачный сервис</option>
       </select>
 
+      <label class="check">
+        <input id="liveStream" type="checkbox"> Онлайн-трансляция
+      </label>
+      <small>Для прямого эфира; обычную запись оставьте без галочки.</small>
+
       <label for="translateTo">Перевод</label>
       <select id="translateTo">
         <option value="">Без перевода</option>
@@ -82,6 +87,7 @@
       <input id="apiUrl" type="url" value="http://127.0.0.1:8000">
 
       <button id="prepare">Подготовить субтитры</button>
+      <button id="stopLive" type="button" hidden>Остановить онлайн-трансляцию</button>
       <p id="status" role="status">Готово</p>
       <script src="popup-tts-settings.js"></script>
       <script src="popup.js"></script>

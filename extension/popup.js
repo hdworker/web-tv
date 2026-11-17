@@ -3,9 +3,11 @@ const fields = {
   translateTo: document.querySelector("#translateTo"),
   translationEngine: document.querySelector("#translationEngine"),
   captionOffset: document.querySelector("#captionOffset"),
+  liveStream: document.querySelector("#liveStream"),
   apiUrl: document.querySelector("#apiUrl")
 };
 const button = document.querySelector("#prepare");
+const stopLiveButton = document.querySelector("#stopLive");
 const statusText = document.querySelector("#status");
 const STORED = [
   "mode", "translateTo", "translationEngine", "captionOffset",
@@ -20,6 +22,9 @@ chrome.storage.local.get(STORED, (settings) => {
   }
   PopupTtsSettings.init(settings);
 });
+
+refreshStopButton();
+chrome.storage.onChanged.addListener(refreshStopButton);
 
 fields.captionOffset.addEventListener("change", () => {
   const offset = normalizeCaptionOffset(fields.captionOffset.value);
@@ -73,13 +78,44 @@ button.addEventListener("click", async () => {
       mode: settings.mode,
       translateTo: settings.translateTo,
       translationEngine: settings.translationEngine,
+      liveStream: fields.liveStream.checked,
       apiUrl: settings.apiUrl
     });
     if (!response?.ok) throw new Error(response?.error || "Не удалось начать подготовку");
-    statusText.textContent = "Подготовка запущена. Видео пока не запускайте.";
+    statusText.textContent = fields.liveStream.checked
+      ? "Подключаюсь к эфиру. Остановить распознавание можно из этого окна."
+      : "Подготовка запущена. Видео пока не запускайте.";
   } catch (error) {
     statusText.textContent = error.message;
   } finally {
     button.disabled = false;
   }
 });
+
+stopLiveButton.addEventListener("click", stopLiveCapture);
+
+async function stopLiveCapture() {
+  const { captionPreparationJob: job } = await chrome.storage.local.get("captionPreparationJob");
+  if (!job?.liveStream) {
+    statusText.textContent = "Активная онлайн-трансляция не найдена";
+    refreshStopButton();
+    return;
+  }
+  try {
+    const response = await fetch(
+      `${job.apiUrl}/api/videos/captions/jobs/${job.jobId}/stop`,
+      { method: "POST" }
+    );
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.detail || "Не удалось остановить эфир");
+    statusText.textContent = "Останавливаю эфир и сохраняю распознанные фразы…";
+  } catch (error) {
+    statusText.textContent = error.message;
+  }
+}
+
+function refreshStopButton() {
+  chrome.storage.local.get("captionPreparationJob", ({ captionPreparationJob: job }) => {
+    stopLiveButton.hidden = !job?.liveStream;
+  });
+}

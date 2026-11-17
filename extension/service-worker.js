@@ -32,8 +32,11 @@ async function startPreparation(message) {
   const stored = await chrome.storage.local.get(JOB_STORAGE_KEY);
   const existing = stored[JOB_STORAGE_KEY];
   if (existing) {
-    if (existing.videoUrl !== message.videoUrl) {
-      throw new Error("Другая запись уже готовится в расширении");
+    if (
+      existing.videoUrl !== message.videoUrl
+      || Boolean(existing.liveStream) !== Boolean(message.liveStream)
+    ) {
+      throw new Error("Другая подготовка уже выполняется в расширении");
     }
     await chrome.alarms.create(RECONNECT_ALARM, { periodInMinutes: 0.5 });
     CaptionSocket.connectToJob(existing);
@@ -48,7 +51,8 @@ async function startPreparation(message) {
       video_url: message.videoUrl,
       mode: message.mode,
       translate_to: message.translateTo || "",
-      translation_engine: message.translationEngine || "opus"
+      translation_engine: message.translationEngine || "opus",
+      live_stream: Boolean(message.liveStream)
     })
   });
   const result = await response.json();
@@ -67,7 +71,8 @@ async function startPreparation(message) {
     tabId: message.tabId,
     apiUrl,
     videoUrl: message.videoUrl,
-    mode: message.mode
+    mode: message.mode,
+    liveStream: Boolean(message.liveStream)
   };
   await chrome.storage.local.set({ [JOB_STORAGE_KEY]: job });
   await chrome.alarms.create(RECONNECT_ALARM, { periodInMinutes: 0.5 });

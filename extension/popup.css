@@ -57,6 +57,10 @@ button {
   font: inherit;
 }
 
+button[hidden] {
+  display: none;
+}
+
 input[type="range"] {
   width: 100%;
   margin: -3px 0 2px;

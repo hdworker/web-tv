@@ -39,6 +39,34 @@ class CaptionPreparationTests(unittest.TestCase):
         self.assertEqual(response.json()["job_id"], "abc123")
         start_job.assert_called_once()
 
+    def test_prepare_passes_explicit_live_mode_to_job(self):
+        """Проверяет передачу режима эфира при установленной галочке."""
+        with patch(
+            "api.endpoints.caption_preparation.CaptionRepository"
+        ) as repository_factory:
+            with patch("api.endpoints.caption_preparation.start_job") as start_job:
+                repository_factory.return_value.get_cues.return_value = None
+                start_job.return_value = {"job_id": "live-1", "status": "queued"}
+                response = self.client.post(
+                    "/api/videos/captions/prepare",
+                    json={
+                        "video_url": "https://webtv.un.org/en/asset/k13/k13tn4gno5",
+                        "mode": "local",
+                        "live_stream": True,
+                    },
+                )
+
+        self.assertEqual(response.status_code, 202)
+        self.assertTrue(start_job.call_args.kwargs["live_stream"])
+
+    def test_stop_route_requests_live_job_shutdown(self):
+        """Проверяет API-команду остановки активного эфира."""
+        with patch("api.endpoints.caption_preparation.stop_job", return_value=True):
+            response = self.client.post("/api/videos/captions/jobs/live-1/stop")
+
+        self.assertEqual(response.status_code, 202)
+        self.assertEqual(response.json()["status"], "stopping")
+
     def test_prepare_rejects_non_un_domain(self):
         """Проверяет запрет URL за пределами UN Web TV."""
         response = self.client.post(

@@ -13,6 +13,7 @@ def cache_identity(
     mode: str,
     translate_to: str = "",
     translation_engine: str = "",
+    live_stream: bool = False,
 ) -> dict[str, str]:
     """Формирует ключи архива и транскрипции с учётом распознавания и перевода."""
     canonical_url = _canonical_url(video_url)
@@ -31,6 +32,8 @@ def cache_identity(
         "translation_engine": translation_engine if translate_to else "",
         "pipeline_version": PIPELINE_VERSION,
     }
+    if live_stream:
+        cache_payload["source_mode"] = "live"
     cache_key = _digest(json.dumps(cache_payload, sort_keys=True))
     return {
         "canonical_url": canonical_url,
